@@ -61,7 +61,7 @@
     "femto-fsrs": "^2.0.0",
     "next": "^14.2.4",
     "next-auth": "^4.24.7",
-    "node-fetch": "^2.6.12",
+    "node-fetch": "^2.7.0",
     "nodemailer": "^6.9.13",
     "posthog-js": "^1.252.1",
     "posthog-node": "^5.1.0",
