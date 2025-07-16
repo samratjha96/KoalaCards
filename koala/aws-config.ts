@@ -1,7 +1,7 @@
 /**
  * AWS Configuration
  */
-// AWS Configuration Module
+import { errorReport } from "./error-report";
 
 // AWS Environment Variables
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
@@ -10,6 +10,11 @@ const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME;
 // Bedrock Model IDs
 const BEDROCK_TEXT_MODEL_ID = process.env.BEDROCK_TEXT_MODEL_ID || "anthropic.claude-3-5-sonnet-20240620-v1:0";
 const BEDROCK_IMAGE_MODEL_ID = process.env.BEDROCK_IMAGE_MODEL_ID || "stability.stable-diffusion-xl-v1";
+
+// Verify required environment variables
+if (!AWS_S3_BUCKET_NAME) {
+  errorReport("Missing ENV Var: AWS_S3_BUCKET_NAME");
+}
 
 // AWS configuration object
 export const awsConfig = {

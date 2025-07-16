@@ -1,19 +1,9 @@
-/**
- * Image generation using AWS Bedrock Stable Diffusion
- */
-import { 
-  createImagePrompt, 
-  createBedrockImage
-} from "./bedrock";
+// This is a replacement for the original image.ts file using AWS services
+import { createImagePrompt, createBedrockImage } from "./aws-services";
 import { prismaClient } from "./prisma-client";
-import { 
-  bucket,
-  createBlobID,
-  storeUrlToS3,
-  getSignedS3Url
-} from "./storage";
+import { getSignedS3Url, createBlobID, storeUrlToS3 } from "./aws-services";
 
-// Type definitions for card data
+// fetcher will just show images if present.
 type Card = {
   id: number;
   term: string;
@@ -22,9 +12,6 @@ type Card = {
   imageBlobId: string | null;
 };
 
-/**
- * Retrieves a signed URL for a card image
- */
 export async function maybeGetCardImageUrl(
   blobID: string | null,
 ): Promise<string | undefined> {
@@ -35,19 +22,13 @@ export async function maybeGetCardImageUrl(
   return await getSignedS3Url(blobID);
 }
 
-// Percentage of cards that will get an image
-const CHEAPNESS = 1;
+const CHEAPNESS = 1; // % of cards that will get an image.
 
-/**
- * Adds an image to a card by generating one using AWS Bedrock Stable Diffusion
- */
 export async function maybeAddImageToCard(card: Card) {
-  // Skip if card already has an image
   if (card.imageBlobId) {
     return;
   }
 
-  // Count how many cards from this user already have images
   const cardCount = await prismaClient.card.count({
     where: {
       userId: card.userId,
@@ -55,7 +36,6 @@ export async function maybeAddImageToCard(card: Card) {
     },
   });
 
-  // Rate limiting logic - only generate images for a small percentage of cards
   const cheap = Math.random() < CHEAPNESS / 100;
   const skip = cardCount < 50 ? false : cheap;
 
@@ -63,24 +43,14 @@ export async function maybeAddImageToCard(card: Card) {
     return;
   }
 
-  // Generate a prompt for the image using Bedrock LLM
   const prompt = await createImagePrompt(card.term, card.definition);
-  
-  // Generate the image using Stable Diffusion
-  const url = await createBedrockImage(prompt);
-  
-  // Create a unique ID for the image file
+  const url = await createBedrockImage(prompt, card.definition);
   const filePath = createBlobID("card-images", card.term, "jpg");
-  
-  // Store the generated image in S3
   await storeUrlToS3(url, filePath);
-  
-  // Update the card in the database with the image blob ID
   await prismaClient.card.update({
     where: { id: card.id },
     data: { imageBlobId: filePath },
   });
 
-  // Return the signed URL for the image
   return await maybeGetCardImageUrl(filePath);
 }

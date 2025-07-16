@@ -8,6 +8,7 @@ import {
 import { errorReport } from "./error-report";
 import { bedrockConfig } from "./aws-config";
 import { getAwsClientConfig } from "./aws-credential-config";
+import { createImagePrompt } from "./bedrock-llm";
 
 // Create Bedrock client with proper credential chain
 const bedrockClient = new BedrockRuntimeClient(getAwsClientConfig());
@@ -96,3 +97,26 @@ export async function generateImage(prompt: string): Promise<string> {
     return errorReport(`Failed to generate image: ${error}`);
   }
 }
+
+/**
+ * Creates a prompt using Claude and then generates an image using Stable Diffusion
+ * @param term The term to illustrate
+ * @param definition The definition of the term
+ * @returns A URL to the generated image
+ */
+export const createBedrockImage = async (
+  prompt: string,
+  definition?: string,
+): Promise<string> => {
+  try {
+    // If definition is provided, we'll use it as additional context
+    const imagePrompt = definition 
+      ? `${prompt} - ${definition}` 
+      : prompt;
+    
+    // Generate an image using Stable Diffusion
+    return await generateImage(imagePrompt);
+  } catch (error) {
+    return errorReport(`Failed to create image: ${error}`);
+  }
+};

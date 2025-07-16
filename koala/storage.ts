@@ -5,7 +5,6 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Upload } from "@aws-sdk/lib-storage";
 import { createHash } from "crypto";
-import fetch from "node-fetch";
 import { errorReport } from "./error-report";
 import { s3Config } from "./aws-config";
 import { getAwsClientConfig } from "./aws-credential-config";
@@ -100,6 +99,7 @@ export const bucket = {
               reject(data);
             }
           }
+          }
         };
       }
     };
@@ -155,21 +155,6 @@ export async function storeUrlToS3(
   } catch (error) {
     return errorReport(`Failed to upload to S3: ${error}`);
   }
-
-  const blob = bucket.file(destination);
-  blob.cloudStorageURI;
-  const blobStream = blob.createWriteStream();
-
-  response.body.pipe(blobStream);
-
-  return new Promise((resolve, reject) => {
-    blobStream.on("finish", async () => {
-      resolve(await expiringUrl(blob));
-    });
-    blobStream.on("error", (error) => {
-      reject(error);
-    });
-  });
 }
 
 /**
