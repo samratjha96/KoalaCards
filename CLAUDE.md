@@ -13,7 +13,8 @@ KoalaCards is a language‑learning flashcard app with SRS (Spaced Repetition Sy
 - **Tests:** `npm test` or `npm run test:coverage` for coverage reports
 - **Format Code:** `npm run format`
 - **Start Local Server:** `docker-compose up --build -d` (runs local server on port 3000)
-
+- **Never run:** build, dev (localhost:3000 already running), start, or any DB ops
+- **THE DEV SERVER RUNS IN A CONTAINER!!!** Don't expect the DB to be available on local. Don't try to run the dev server on bare metal. The same goes for the database - it's not on the host, it's on Docker.
 ## Architecture
 
 ### Tech Stack

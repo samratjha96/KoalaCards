@@ -155,6 +155,21 @@ export async function storeUrlToS3(
   } catch (error) {
     return errorReport(`Failed to upload to S3: ${error}`);
   }
+
+  const blob = bucket.file(destination);
+  blob.cloudStorageURI;
+  const blobStream = blob.createWriteStream();
+
+  response.body.pipe(blobStream);
+
+  return new Promise((resolve, reject) => {
+    blobStream.on("finish", async () => {
+      resolve(await expiringUrl(blob));
+    });
+    blobStream.on("error", (error) => {
+      reject(error);
+    });
+  });
 }
 
 /**

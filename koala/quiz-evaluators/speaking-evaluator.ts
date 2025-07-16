@@ -1,6 +1,6 @@
 import { compare } from "./evaluator-utils";
 import { QuizEvaluator } from "./types";
-import { grammarCorrectionNext } from "../grammar";
+import { grammarCorrectionNext } from "../grammar-aws";
 
 export const speaking: QuizEvaluator = async (input) => {
   const { userInput, card } = input;

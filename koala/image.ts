@@ -41,7 +41,7 @@ export async function maybeGetCardImageUrl(
 }
 
 // Percentage of cards that will get an image
-const CHEAPNESS = 1; 
+const CHEAPNESS = 1;
 
 /**
  * Adds an image to a card by generating one using AWS Bedrock Stable Diffusion
