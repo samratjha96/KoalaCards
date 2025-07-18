@@ -1,4 +1,4 @@
-import { gptCall } from "./openai";
+import { gptCall } from "./bedrock";
 import { Gender } from "./shared-types";
 
 interface Card {

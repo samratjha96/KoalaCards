@@ -1,7 +1,7 @@
 import { shuffle } from "radash";
 import { z } from "zod";
 import { getLangName } from "../get-lang-name";
-import { openai } from "../openai";
+import { openai } from "../bedrock";
 import { prismaClient } from "../prisma-client";
 import { procedure } from "../trpc-procedure";
 import { TRPCError } from "@trpc/server";

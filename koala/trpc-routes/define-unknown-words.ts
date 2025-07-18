@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { openai } from "../openai";
-import { zodResponseFormat } from "openai/helpers/zod";
+import { openai } from "../bedrock";
+import { zodResponseFormat } from "../zod-helpers";
 import { LANG_CODES } from "../shared-types"; // Import LangCode type
 import { procedure } from "../trpc-procedure";
 import { getLangName } from "../get-lang-name";

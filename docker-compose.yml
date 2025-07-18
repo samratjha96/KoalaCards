@@ -3,20 +3,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME}
+        - AWS_REGION=${AWS_REGION}
+    working_dir: /app
     command: npm run dev
     entrypoint: ./entrypoint.sh
     volumes:
-      - .:/app
-      - ./node_modules:/app/node_modules
+      - ~/.aws:/root/.aws:ro  # Mount host AWS credentials (read-only)
     ports:
       - "3000:3000"
       - "5555:5555" # Prisma Studio, optional
     env_file:
       - .env
     environment:
-      POSTGRES_URI: postgres://prisma:your_password@db:5432/prisma
+      NODE_OPTIONS: "--max-old-space-size=4096"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - koala-network
 
@@ -41,7 +45,10 @@ services:
 
 volumes:
   db-data:
+    name: koala-db-data
 
 networks:
   koala-network:
+    name: koala-network
     driver: bridge
+

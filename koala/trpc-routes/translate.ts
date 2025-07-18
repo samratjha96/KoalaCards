@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { openai } from "../openai";
+import { openai } from "../bedrock";
 import { procedure } from "../trpc-procedure";
 import { TRPCError } from "@trpc/server";
 

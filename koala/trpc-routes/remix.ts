@@ -1,11 +1,15 @@
-import { zodResponseFormat } from "openai/helpers/zod";
+import { zodResponseFormat } from "../zod-helpers";
 import { z } from "zod";
 import { getUserSettings } from "../auth-helpers";
-import { openai } from "../openai";
+import { openai } from "../bedrock";
 import { prismaClient } from "../prisma-client";
 import { RemixTypePrompts, RemixTypes } from "../remix-types";
 import { procedure } from "../trpc-procedure";
-import { ChatCompletionMessageParam } from "openai/resources";
+// Locally defined ChatCompletionMessageParam
+type ChatCompletionMessageParam = {
+  role: string;
+  content: string;
+};
 
 interface RemixParams {
   type: RemixTypes;

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { openai } from "../openai";
+import { openai } from "../bedrock";
 import { prismaClient } from "../prisma-client";
 import { procedure } from "../trpc-procedure";
 import { LangCode } from "../shared-types";

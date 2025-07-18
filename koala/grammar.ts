@@ -1,12 +1,21 @@
-import { zodResponseFormat } from "openai/helpers/zod";
+/**
+ * Grammar correction implementation using AWS Bedrock
+ */
+// Import zod for schema validation
 import { z } from "zod";
-import { openai } from "./openai";
+import { bedrockParseWithSchema } from './bedrock';
 import { prismaClient } from "./prisma-client";
 import { QuizEvaluator } from "./quiz-evaluators/types";
 import { getLangName } from "./get-lang-name";
 import { LangCode } from "./shared-types";
 
-type Explanation = z.infer<typeof zodGradeResponse>;
+// Define the response schema for grammar correction
+const _zodGradeResponse = z.object({
+  yesNo: z.enum(["yes", "no"]),
+  why: z.string(),
+});
+
+type Explanation = z.infer<typeof _zodGradeResponse>;
 
 type GrammarCorrectionProps = {
   term: string; // Prompt term
@@ -20,11 +29,6 @@ type StoreTrainingData = (
   exp: Explanation,
 ) => Promise<void>;
 
-const zodGradeResponse = z.object({
-  yesNo: z.enum(["yes", "no"]),
-  why: z.string(),
-});
-
 const storeTrainingData: StoreTrainingData = async (props, exp) => {
   const { term, definition, langCode, userInput } = props;
   const { yesNo, why } = exp;
@@ -37,7 +41,7 @@ const storeTrainingData: StoreTrainingData = async (props, exp) => {
       userInput,
       yesNo,
       explanation: why,
-      quizType: "speaking-v2-prompt-4.1",
+      quizType: "speaking-v2-aws-bedrock",
       englishTranslation: "NA",
     },
   });
@@ -49,35 +53,38 @@ const LANG_OVERRIDES: Partial<Record<LangCode, string>> = {
 
 async function run(props: GrammarCorrectionProps): Promise<Explanation> {
   const override = LANG_OVERRIDES[props.langCode as LangCode] || "";
-  const messages = [
-    {
-      role: "user" as const,
-      content: [
-        `I am learning ${getLangName(props.langCode)}.`,
-        `We know "${props.term}" means "${props.definition}" in English.`,
-        `Let's say I am in a situation that warrants the sentence above.`,
-        `Could I say "${props.userInput}" instead (note: I entered it via speech-to-text)?`,
-        `Would that be OK?`,
-        override,
-        `Explain in one tweet or less.`,
-      ].join(" "),
+  const prompt = [
+    `I am learning ${getLangName(props.langCode)}.`,
+    `We know "${props.term}" means "${props.definition}" in English.`,
+    `Let's say I am in a situation that warrants the sentence above.`,
+    `Could I say "${props.userInput}" instead (note: I entered it via speech-to-text)?`,
+    `Would that be OK?`,
+    override,
+    `Explain in one tweet or less.`,
+  ].join(" ");
+
+  // Define the schema for response validation
+  const schema = {
+    type: "object",
+    properties: {
+      yesNo: {
+        type: "string",
+        enum: ["yes", "no"]
+      },
+      why: {
+        type: "string"
+      }
     },
-  ];
-  const response = await openai.beta.chat.completions.parse({
-    messages,
-    model: "gpt-4.1",
+    required: ["yesNo", "why"]
+  };
+
+  // Call Bedrock with the schema
+  return await bedrockParseWithSchema<Explanation>({
+    messages: [{ role: "user", content: prompt }],
+    schema,
     temperature: 0.1,
     max_tokens: 250,
-    response_format: zodResponseFormat(zodGradeResponse, "grade_response"),
   });
-
-  const gradeResponse = response.choices[0]?.message?.parsed;
-
-  if (!gradeResponse) {
-    throw new Error("Invalid response format from OpenAI.");
-  }
-
-  return gradeResponse;
 }
 
 async function runAndStore(

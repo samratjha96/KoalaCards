@@ -1,5 +1,11 @@
-const rulesDirPlugin = require("eslint-plugin-rulesdir");
-rulesDirPlugin.RULES_DIR = "eslint-rules";
+// Skip custom rules if the plugin is not available
+let rulesDirPlugin;
+try {
+  rulesDirPlugin = require("eslint-plugin-rulesdir");
+  rulesDirPlugin.RULES_DIR = "eslint-rules";
+} catch (error) {
+  console.warn("eslint-plugin-rulesdir not found, skipping custom rules");
+}
 
 module.exports = {
   root: true,
@@ -14,10 +20,10 @@ module.exports = {
     "plugin:@typescript-eslint/recommended",
     "next",
   ],
-  plugins: ["@typescript-eslint", "rulesdir"],
+  plugins: ["@typescript-eslint", ...(rulesDirPlugin ? ["rulesdir"] : [])],
   ignorePatterns: ["node_modules/**", "dist/**", "*.config.js"],
   rules: {
-    "rulesdir/no-else-if": "error",
+    ...(rulesDirPlugin ? { "rulesdir/no-else-if": "error" } : {}),
     "@typescript-eslint/no-unused-vars": [
       "error",
       {

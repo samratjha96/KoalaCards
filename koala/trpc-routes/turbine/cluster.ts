@@ -1,9 +1,13 @@
-import { openai } from "@/koala/openai";
-import { zodResponseFormat } from "openai/helpers/zod";
+import { openai } from "@/koala/bedrock";
+import { zodResponseFormat } from "../../zod-helpers";
 import { z } from "zod";
 import { clean } from "./util";
 import { alphabetical, cluster, template, unique } from "radash";
-import { ChatCompletionMessageParam } from "openai/resources";
+// Locally defined ChatCompletionMessageParam
+type ChatCompletionMessageParam = {
+  role: string;
+  content: string;
+};
 import { supportedLanguages } from "@/koala/shared-types";
 
 const TRANSLATION = z.array(

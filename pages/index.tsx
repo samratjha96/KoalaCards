@@ -38,7 +38,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const dbUser = await getServersideUser(context);
   if (!dbUser) {
     return {
-      redirect: { destination: "/api/auth/signin", permanent: false },
+      redirect: { destination: "/landing", permanent: false },
     };
   }
   const cardCount = await prismaClient.card.count({

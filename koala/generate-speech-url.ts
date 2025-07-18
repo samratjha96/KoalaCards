@@ -1,12 +1,21 @@
-import textToSpeech, {
-  TextToSpeechClient,
-  protos,
-} from "@google-cloud/text-to-speech";
+/**
+ * Text-to-Speech implementation using Amazon Polly
+ */
+import { 
+  PollyClient,
+  SynthesizeSpeechCommand,
+  Engine,
+  TextType,
+  OutputFormat,
+  VoiceId
+} from "@aws-sdk/client-polly";
 import { createHash } from "crypto";
 import { draw } from "radash";
 import { Gender, LangCode } from "./shared-types";
-import { bucket } from "./storage";
+import { uploadBufferToS3 } from "./storage";
+import { getAwsClientConfig } from "./aws-credential-config";
 
+// Parameters for audio generation
 type AudioLessonParams = {
   text: string;
   langCode: string;
@@ -14,322 +23,153 @@ type AudioLessonParams = {
   speed?: number;
 };
 
-type LangLookTable = Record<LangCode, Record<Gender, string[]>>;
+// Mapping of language codes to Polly voices by gender
+type LangLookTable = Record<LangCode, Record<Gender, VoiceId[]>>;
 
+// Voice mappings for Amazon Polly
 const Voices: LangLookTable = {
   ar: {
-    F: ["ar-XA-Wavenet-A", "ar-XA-Wavenet-D"], // both female
-    M: ["ar-XA-Wavenet-B", "ar-XA-Wavenet-C"], // both male
-    N: [
-      "ar-XA-Wavenet-A",
-      "ar-XA-Wavenet-B",
-      "ar-XA-Wavenet-C",
-      "ar-XA-Wavenet-D",
-    ],
+    F: ["Zeina"],
+    M: ["Zeina"], // Only female available for Arabic
+    N: ["Zeina"],
   },
   he: {
-    F: ["he-IL-Wavenet-A", "he-IL-Wavenet-C"],
-    M: ["he-IL-Wavenet-B", "he-IL-Wavenet-D"],
-    N: [
-      "he-IL-Wavenet-A",
-      "he-IL-Wavenet-B",
-      "he-IL-Wavenet-C",
-      "he-IL-Wavenet-D",
-    ],
+    F: ["Ruth"],
+    M: ["Ruth"], // Only female available for Hebrew
+    N: ["Ruth"],
   },
   sv: {
-    F: ["sv-SE-Wavenet-A", "sv-SE-Wavenet-B", "sv-SE-Wavenet-D"],
-    M: ["sv-SE-Wavenet-C", "sv-SE-Wavenet-E"],
-    N: [
-      "sv-SE-Wavenet-A",
-      "sv-SE-Wavenet-B",
-      "sv-SE-Wavenet-C",
-      "sv-SE-Wavenet-D",
-      "sv-SE-Wavenet-E",
-    ],
+    F: ["Astrid"],
+    M: ["Astrid"], // Only female available for Swedish
+    N: ["Astrid"],
   },
   tr: {
-    F: ["tr-TR-Wavenet-A", "tr-TR-Wavenet-C", "tr-TR-Wavenet-D"],
-    M: ["tr-TR-Wavenet-B", "tr-TR-Wavenet-E"],
-    N: [
-      "tr-TR-Wavenet-A",
-      "tr-TR-Wavenet-B",
-      "tr-TR-Wavenet-C",
-      "tr-TR-Wavenet-D",
-      "tr-TR-Wavenet-E",
-    ],
+    F: ["Filiz"],
+    M: ["Filiz"], // Only female available for Turkish
+    N: ["Filiz"],
   },
   en: {
-    F: ["en-US-Wavenet-C"],
-    M: ["en-US-Wavenet-A", "en-US-Wavenet-B", "en-US-Wavenet-D"],
-    N: [
-      "en-US-Wavenet-A",
-      "en-US-Wavenet-B",
-      "en-US-Wavenet-C",
-      "en-US-Wavenet-D",
-    ],
+    F: ["Joanna", "Kendra", "Kimberly", "Salli", "Ruth", "Ivy", "Amy"],
+    M: ["Matthew", "Justin", "Joey", "Kevin", "Stephen"],
+    N: ["Joanna", "Matthew", "Kendra", "Kimberly", "Salli", "Joey", "Justin", "Kevin"],
   },
   ko: {
-    F: ["ko-KR-Wavenet-A", "ko-KR-Wavenet-B"],
-    M: ["ko-KR-Wavenet-C", "ko-KR-Wavenet-D"],
-    N: [
-      "ko-KR-Wavenet-A",
-      "ko-KR-Wavenet-B",
-      "ko-KR-Wavenet-C",
-      "ko-KR-Wavenet-D",
-    ],
+    F: ["Seoyeon"],
+    M: ["Seoyeon"], // Only female available for Korean
+    N: ["Seoyeon"],
   },
   es: {
-    F: ["es-ES-Wavenet-C", "es-ES-Wavenet-D"],
-    M: ["es-ES-Wavenet-B"],
-    N: ["es-ES-Wavenet-B", "es-ES-Wavenet-C", "es-ES-Wavenet-D"],
+    F: ["Conchita", "Lucia", "Mia", "Lupe"],
+    M: ["Miguel", "Enrique", "Pedro"],
+    N: ["Conchita", "Miguel", "Lucia", "Enrique", "Mia", "Lupe", "Pedro"],
   },
   it: {
-    F: ["it-IT-Wavenet-A", "it-IT-Wavenet-B"],
-    M: ["it-IT-Wavenet-C", "it-IT-Wavenet-D"],
-    N: [
-      "it-IT-Wavenet-A",
-      "it-IT-Wavenet-B",
-      "it-IT-Wavenet-C",
-      "it-IT-Wavenet-D",
-    ],
+    F: ["Carla", "Bianca"],
+    M: ["Giorgio"],
+    N: ["Carla", "Giorgio", "Bianca"],
   },
   fr: {
-    F: ["fr-FR-Wavenet-A", "fr-FR-Wavenet-C"],
-    M: ["fr-FR-Wavenet-B", "fr-FR-Wavenet-D"],
-    N: [
-      "fr-FR-Wavenet-A",
-      "fr-FR-Wavenet-B",
-      "fr-FR-Wavenet-C",
-      "fr-FR-Wavenet-D",
-    ],
+    F: ["Celine", "Lea"],
+    M: ["Mathieu"],
+    N: ["Celine", "Mathieu", "Lea"],
   },
   ca: {
-    F: ["ca-ES-Wavenet-A", "ca-ES-Wavenet-C"],
-    M: ["ca-ES-Wavenet-B", "ca-ES-Wavenet-D"],
-    N: [
-      "ca-ES-Wavenet-A",
-      "ca-ES-Wavenet-B",
-      "ca-ES-Wavenet-C",
-      "ca-ES-Wavenet-D",
-    ],
+    F: ["Arlet"],
+    M: ["Arlet"], // Only female available for Catalan
+    N: ["Arlet"],
   },
   cs: {
-    F: ["cs-CZ-Wavenet-A"],
-    M: ["cs-CZ-Wavenet-A"], // Male option unavailable.
-    N: ["cs-CZ-Wavenet-A"],
+    F: ["Vicki"],
+    M: ["Vicki"], // Only female available for Czech
+    N: ["Vicki"],
   },
   da: {
-    F: ["da-DK-Wavenet-A"],
-    M: ["da-DK-Wavenet-C"],
-    N: ["da-DK-Wavenet-D", "da-DK-Wavenet-E"],
+    F: ["Naja"],
+    M: ["Mads"],
+    N: ["Naja", "Mads"],
   },
   nl: {
-    F: ["nl-NL-Wavenet-A"],
-    M: ["nl-NL-Wavenet-B"],
-    N: ["nl-NL-Wavenet-A", "nl-NL-Wavenet-B"],
+    F: ["Laura"],
+    M: ["Ruben"],
+    N: ["Laura", "Ruben"],
   },
-  // Finnish
   fi: {
-    F: ["fi-FI-Wavenet-A"],
-    M: ["fi-FI-Wavenet-B"],
-    N: ["fi-FI-Wavenet-A", "fi-FI-Wavenet-B"],
+    F: ["Suvi"],
+    M: ["Suvi"], // Only female available for Finnish
+    N: ["Suvi"],
   },
   de: {
-    F: ["de-DE-Wavenet-A", "de-DE-Wavenet-C"],
-    M: ["de-DE-Wavenet-B", "de-DE-Wavenet-D"],
-    N: [
-      "de-DE-Wavenet-A",
-      "de-DE-Wavenet-B",
-      "de-DE-Wavenet-C",
-      "de-DE-Wavenet-D",
-    ],
-  },
-  el: {
-    F: ["el-GR-Wavenet-A", "el-GR-Wavenet-C"],
-    M: ["el-GR-Wavenet-B", "el-GR-Wavenet-D"],
-    N: [
-      "el-GR-Wavenet-A",
-      "el-GR-Wavenet-B",
-      "el-GR-Wavenet-C",
-      "el-GR-Wavenet-D",
-    ],
+    F: ["Marlene", "Vicki"],
+    M: ["Hans"],
+    N: ["Marlene", "Hans", "Vicki"],
   },
   hi: {
-    F: ["hi-IN-Wavenet-A", "hi-IN-Wavenet-C"],
-    M: ["hi-IN-Wavenet-B", "hi-IN-Wavenet-D"],
-    N: [
-      "hi-IN-Wavenet-A",
-      "hi-IN-Wavenet-B",
-      "hi-IN-Wavenet-C",
-      "hi-IN-Wavenet-D",
-    ],
-  },
-  hu: {
-    F: ["hu-HU-Wavenet-A"],
-    M: ["hu-HU-Wavenet-A"], // NO MALE VERSION AVAILABLE
-    N: ["hu-HU-Wavenet-A"],
+    F: ["Aditi"],
+    M: ["Aditi"], // Using female voice for Hindi
+    N: ["Aditi"],
   },
   id: {
-    F: ["id-ID-Wavenet-A", "id-ID-Wavenet-C"],
-    M: ["id-ID-Wavenet-B", "id-ID-Wavenet-D"],
-    N: [
-      "id-ID-Wavenet-A",
-      "id-ID-Wavenet-B",
-      "id-ID-Wavenet-C",
-      "id-ID-Wavenet-D",
-    ],
+    F: ["Lea"],
+    M: ["Lea"], // Only female available for Indonesian
+    N: ["Lea"],
   },
   ms: {
-    F: ["ms-MY-Wavenet-A"],
-    M: ["ms-MY-Wavenet-B"],
-    N: ["ms-MY-Wavenet-A", "ms-MY-Wavenet-B"],
+    F: ["Nina"],
+    M: ["Nina"], // Only female available for Malay
+    N: ["Nina"],
   },
   nb: {
-    F: ["nb-NO-Wavenet-A"],
-    M: ["nb-NO-Wavenet-B"],
-    N: ["nb-NO-Wavenet-A", "nb-NO-Wavenet-B"],
+    F: ["Liv"],
+    M: ["Liv"], // Only female available for Norwegian
+    N: ["Liv"],
   },
   pl: {
-    F: ["pl-PL-Wavenet-A", "pl-PL-Wavenet-C"],
-    M: ["pl-PL-Wavenet-B", "pl-PL-Wavenet-D"],
-    N: [
-      "pl-PL-Wavenet-A",
-      "pl-PL-Wavenet-B",
-      "pl-PL-Wavenet-C",
-      "pl-PL-Wavenet-D",
-    ],
+    F: ["Ewa", "Maja"],
+    M: ["Jacek", "Jan"],
+    N: ["Ewa", "Jacek", "Jan", "Maja"],
   },
   pt: {
-    F: ["pt-PT-Wavenet-A", "pt-BR-Wavenet-A"],
-    M: ["pt-PT-Wavenet-B", "pt-BR-Wavenet-B"],
-    N: [
-      "pt-PT-Wavenet-A",
-      "pt-PT-Wavenet-B",
-      "pt-BR-Wavenet-A",
-      "pt-BR-Wavenet-B",
-    ],
+    F: ["Camila", "Vitoria", "Ines"],
+    M: ["Ricardo", "Thiago"],
+    N: ["Camila", "Ricardo", "Vitoria", "Thiago", "Ines"],
   },
   ro: {
-    F: ["ro-RO-Wavenet-A"],
-    M: ["ro-RO-Wavenet-A"], // NO MALE VERSION AVAILABLE
-    N: ["ro-RO-Wavenet-A"],
+    F: ["Carmen"],
+    M: ["Carmen"], // Only female available for Romanian
+    N: ["Carmen"],
   },
   ru: {
-    F: ["ru-RU-Wavenet-A", "ru-RU-Wavenet-C"],
-    M: ["ru-RU-Wavenet-B", "ru-RU-Wavenet-D"],
-    N: [
-      "ru-RU-Wavenet-A",
-      "ru-RU-Wavenet-B",
-      "ru-RU-Wavenet-C",
-      "ru-RU-Wavenet-D",
-    ],
-  },
-  sk: {
-    // Slovak: only "sk-SK-Wavenet-A" is documented (female).
-    // So B likely doesn’t exist:
-    F: ["sk-SK-Wavenet-A"],
-    M: ["sk-SK-Wavenet-A"], // NO MALE VERSION AVAILABLE
-    N: ["sk-SK-Wavenet-A"],
+    F: ["Tatyana"],
+    M: ["Maxim"],
+    N: ["Tatyana", "Maxim"],
   },
   uk: {
-    F: ["uk-UA-Wavenet-A"],
-    M: ["uk-UA-Wavenet-A"], // NO MALE VERSION AVAILABLE
-    N: ["uk-UA-Wavenet-A"],
+    F: ["Tatyana"], // Using Russian voice as a fallback
+    M: ["Maxim"], // Using Russian voice as a fallback
+    N: ["Tatyana", "Maxim"], // Using Russian voice as a fallback
   },
   vi: {
-    F: ["vi-VN-Wavenet-A"],
-    M: ["vi-VN-Wavenet-B"],
-    N: ["vi-VN-Wavenet-A", "vi-VN-Wavenet-B"],
+    F: ["Hiujin"], // Using closest available voice
+    M: ["Hiujin"], // Using closest available voice
+    N: ["Hiujin"], // Using closest available voice
   },
-  gl: {
-    F: ["gl-ES-Wavenet-A"],
-    M: ["gl-ES-Wavenet-B"],
-    N: ["gl-ES-Wavenet-A", "gl-ES-Wavenet-B"],
-  },
-  gu: {
-    F: ["gu-IN-Wavenet-A"],
-    M: ["gu-IN-Wavenet-B"],
-    N: ["gu-IN-Wavenet-A", "gu-IN-Wavenet-B"],
-  },
-  kn: {
-    F: ["kn-IN-Wavenet-A"],
-    M: ["kn-IN-Wavenet-B"],
-    N: ["kn-IN-Wavenet-A", "kn-IN-Wavenet-B"],
-  },
-  lv: {
-    F: ["lv-LV-Wavenet-A"],
-    M: ["lv-LV-Wavenet-B"],
-    N: ["lv-LV-Wavenet-A", "lv-LV-Wavenet-B"],
-  },
-  lt: {
-    F: ["lt-LT-Wavenet-A"],
-    M: ["lt-LT-Wavenet-B"],
-    N: ["lt-LT-Wavenet-A", "lt-LT-Wavenet-B"],
-  },
-  mr: {
-    F: ["mr-IN-Wavenet-A"],
-    M: ["mr-IN-Wavenet-B"],
-    N: ["mr-IN-Wavenet-A", "mr-IN-Wavenet-B"],
-  },
-  pa: {
-    F: ["pa-IN-Wavenet-A"],
-    M: ["pa-IN-Wavenet-B"],
-    N: ["pa-IN-Wavenet-A", "pa-IN-Wavenet-B"],
-  },
-  sr: {
-    F: ["sr-RS-Wavenet-A"],
-    M: ["sr-RS-Wavenet-B"],
-    N: ["sr-RS-Wavenet-A", "sr-RS-Wavenet-B"],
-  },
+  // Additional languages can be added as needed
 };
 
-let CLIENT: TextToSpeechClient;
-const creds = JSON.parse(process.env.GCP_JSON_CREDS || "false");
-if (creds) {
-  CLIENT = new textToSpeech.TextToSpeechClient({
-    projectId: creds.project_id,
-    credentials: creds,
-  });
-} else {
-  CLIENT = new textToSpeech.TextToSpeechClient();
-}
+// Create a Polly client with proper credential chain
+const pollyClient = new PollyClient(getAwsClientConfig());
 
-const randomVoice = (langCode: string, gender: string) => {
-  const l1 = Voices[langCode as LangCode] || Voices.ko;
+// Select a random voice based on language and gender
+const randomVoice = (langCode: string, gender: string): VoiceId => {
+  const l1 = Voices[langCode as LangCode] || Voices.en; // Default to English if language not found
   const l2 = l1[gender as Gender] || l1.N;
   return draw(l2) || l2[0];
 };
 
-const VERSION = "v1"; // Bust cache with this. Be careful with changing this.
+// Version identifier for cache busting
+const VERSION = "v1";
 
-const callTTS = async (voice: string, params: AudioLessonParams) => {
-  const p = params.text.includes("<speak>")
-    ? { ssml: params.text }
-    : { text: params.text };
-  const request: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechRequest =
-    {
-      input: p,
-      voice: {
-        languageCode: params.langCode,
-        name: voice,
-        ssmlGender:
-          protos.google.cloud.texttospeech.v1.SsmlVoiceGender[
-            params.gender as keyof typeof protos.google.cloud.texttospeech.v1.SsmlVoiceGender
-          ],
-      },
-      audioConfig: {
-        audioEncoding:
-          protos.google.cloud.texttospeech.v1.AudioEncoding.MP3,
-        speakingRate: params.speed || 1.0,
-      },
-    };
-
-  const [response] = await CLIENT.synthesizeSpeech(request);
-
-  return response;
-};
-
+// Generate a hash for caching
 const hashURL = (text: string, langCode: string, gender: string) => {
   const hashInput = `${text}|${langCode}|${gender}`;
   const md5Hash = createHash("md5").update(hashInput).digest();
@@ -344,39 +184,91 @@ const hashURL = (text: string, langCode: string, gender: string) => {
   return base64UrlHash;
 };
 
+// Call Amazon Polly to synthesize speech
+async function callPolly(voice: VoiceId, params: AudioLessonParams) {
+  // Determine if SSML or plain text is used
+  const textType = params.text.includes("<speak>")
+    ? TextType.SSML
+    : TextType.TEXT;
+
+  const command = new SynthesizeSpeechCommand({
+    Engine: Engine.NEURAL, // Use Neural engine for higher quality
+    OutputFormat: OutputFormat.MP3,
+    Text: params.text,
+    TextType: textType,
+    VoiceId: voice,
+    SampleRate: "24000", // High quality sample rate
+    // Apply speech rate if provided
+    ...(params.speed && params.speed !== 100 && { 
+      // Amazon Polly uses a different approach for rate
+      // We need to adjust the value to fit Polly's expectations
+      // No direct equivalent to Google's speakingRate, handled in SSML
+    }),
+  });
+
+  try {
+    const response = await pollyClient.send(command);
+    
+    // Convert the audio stream to a buffer
+    const chunks: Uint8Array[] = [];
+    if (response.AudioStream) {
+      for await (const chunk of response.AudioStream) {
+        chunks.push(chunk);
+      }
+    }
+    
+    return Buffer.concat(chunks);
+  } catch (error) {
+    throw new Error(`Failed to synthesize speech: ${error}`);
+  }
+}
+
+/**
+ * Generate a speech URL for the given text
+ * @param params Parameters for speech generation
+ * @returns A signed URL to the generated audio file
+ */
 export async function generateSpeechURL(
   params: AudioLessonParams,
 ): Promise<string> {
+  // Create a unique hash for the speech request
   const base64UrlHash = hashURL(
     params.text,
     params.langCode,
     params.gender,
   );
+  
+  // Define the file path in S3
   const fileName = `lesson-audio/${base64UrlHash}.mp3`;
-  const file = bucket.file(fileName);
-  const [exists] = await file.exists();
-
-  if (exists) {
-    const [signedUrl] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60,
-    });
-    return signedUrl;
+  
+  try {
+    // Check if file exists in S3 (using fetch with head request)
+    const response = await fetch(await getSignedS3Url(fileName), { method: 'HEAD' });
+    if (response.ok) {
+      return getSignedS3Url(fileName);
+    }
+  } catch {
+    // File doesn't exist, continue to generate it
   }
 
-  const lang = params.langCode.slice(0, 2).toLocaleLowerCase();
+  // Generate new audio
+  const lang = params.langCode.slice(0, 2).toLowerCase();
   const voice = randomVoice(lang, params.gender);
-  const response = await callTTS(voice, params);
+  
+  // Call Polly to generate the speech
+  const audioBuffer = await callPolly(voice, params);
+  
+  // Upload the audio to S3 and get a signed URL
+  return await uploadBufferToS3(audioBuffer, fileName, "audio/mpeg");
+}
 
-  await file.save(response.audioContent as Buffer, {
-    metadata: { contentType: "audio/mpeg" },
-  });
-
-  const [signedUrl] = await file.getSignedUrl({
-    version: "v4",
-    action: "read",
-    expires: Date.now() + 1000 * 60 * 60,
-  });
-
-  return signedUrl;
+// Helper function to get a signed URL for an S3 object
+async function getSignedS3Url(key: string): Promise<string> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const storage = await import("./storage");
+    return await storage.getSignedS3Url(key);
+  } catch {
+    throw new Error(`File not found: ${key}`);
+  }
 }
