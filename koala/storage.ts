@@ -26,10 +26,10 @@ if (!bucketName) {
 interface File {
   key: string;
   exists: () => Promise<[boolean]>;
-  getSignedUrl: (options: any) => Promise<[string]>;
-  save: (data: any, options: any) => Promise<void>;
-  cloudStorageURI: any;
-  createWriteStream: () => any;
+  getSignedUrl: (options: Record<string, unknown>) => Promise<[string]>;
+  save: (data: Buffer, options: Record<string, unknown> | undefined) => Promise<void>;
+  cloudStorageURI: Record<string, unknown>;
+  createWriteStream: () => Record<string, unknown>;
 }
 
 // Mock bucket object with similar methods to Google Cloud Storage but using S3 internally
@@ -66,7 +66,7 @@ export const bucket = {
         // This is a stub for backward compatibility
         const chunks: Buffer[] = [];
         let resolve: (value: unknown) => void;
-        let reject: (reason?: any) => void;
+        let reject: (reason?: Error) => void;
         
         const promise = new Promise((res, rej) => {
           resolve = res;
@@ -98,7 +98,6 @@ export const bucket = {
             if (event === 'error') {
               reject(data);
             }
-          }
           }
         };
       }

@@ -6,8 +6,8 @@ import { errorReport } from "./error-report";
 export const openai = {
   chat: {
     completions: {
-      create: async (opts: any) => {
-        const messages = opts.messages.map((msg: any) => ({
+      create: async (opts: Record<string, unknown>) => {
+        const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
@@ -36,8 +36,8 @@ export const openai = {
           },
         };
       },
-      parse: async (opts: any) => {
-        const messages = opts.messages.map((msg: any) => ({
+      parse: async (opts: Record<string, unknown>) => {
+        const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
@@ -97,7 +97,7 @@ export const openai = {
     },
   },
   images: {
-    generate: async (opts: any) => {
+    generate: async (opts: {prompt: string}) => {
       const imageUrl = await createBedrockImage(opts.prompt, opts.prompt);
       
       return {
@@ -111,7 +111,7 @@ export const openai = {
   },
   audio: {
     transcriptions: {
-      create: async (opts: any) => {
+      create: async (_opts: unknown) => {
         // This is handled by transcribe-aws.ts
         // We need to redirect the calls, but for now just provide a stub
         return {
@@ -123,8 +123,8 @@ export const openai = {
   beta: {
     chat: {
       completions: {
-        parse: async (opts: any) => {
-          const messages = opts.messages.map((msg: any) => ({
+        parse: async (opts: Record<string, unknown>) => {
+          const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
             role: msg.role,
             content: msg.content,
           }));
@@ -186,7 +186,7 @@ export const openai = {
   },
 };
 
-export async function gptCall(opts: any) {
+export async function gptCall(opts: Record<string, unknown>) {
   return await openai.chat.completions.create(opts);
 }
 

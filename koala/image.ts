@@ -7,7 +7,7 @@ import {
 } from "./bedrock";
 import { prismaClient } from "./prisma-client";
 import { 
-  bucket,
+  // bucket is not used directly
   createBlobID,
   storeUrlToS3,
   getSignedS3Url

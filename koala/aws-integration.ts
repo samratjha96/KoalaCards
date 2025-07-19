@@ -63,7 +63,10 @@ export async function updateAllImports(directoryPath: string): Promise<void> {
       if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
         // Recursively process directories
         await updateAllImports(fullPath);
-      } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
+        continue;
+      }
+      
+      if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
         // Process TypeScript files
         await updateImportsToAWS(fullPath);
       }

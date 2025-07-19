@@ -6,7 +6,13 @@ import { QuizEvaluator } from "./quiz-evaluators/types";
 import { getLangName } from "./get-lang-name";
 import { LangCode } from "./shared-types";
 
-type Explanation = z.infer<typeof zodGradeResponse>;
+// Define the schema for responses
+const _zodGradeResponse = z.object({
+  yesNo: z.enum(["yes", "no"]),
+  why: z.string(),
+});
+
+type Explanation = z.infer<typeof _zodGradeResponse>;
 
 type GrammarCorrectionProps = {
   term: string; // Prompt term
@@ -20,10 +26,7 @@ type StoreTrainingData = (
   exp: Explanation,
 ) => Promise<void>;
 
-const zodGradeResponse = z.object({
-  yesNo: z.enum(["yes", "no"]),
-  why: z.string(),
-});
+// Schema already defined at the top of the file
 
 const storeTrainingData: StoreTrainingData = async (props, exp) => {
   const { term, definition, langCode, userInput } = props;

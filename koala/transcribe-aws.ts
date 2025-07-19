@@ -5,7 +5,7 @@ import {
   TranscriptionJobStatus
 } from "@aws-sdk/client-transcribe";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { createReadStream } from "fs";
+// createReadStream is not used, import removed
 import { writeFile, unlink, readFile } from "fs/promises";
 import path from "path";
 import { uid, unique } from "radash";
@@ -33,7 +33,7 @@ function getTranscribeLanguageCode(language: LangCode): string {
 }
 
 // Helper function to wait for a transcription job to complete
-async function waitForTranscriptionJobComplete(jobName: string, maxWaitTimeMs: number = 60000): Promise<any> {
+async function waitForTranscriptionJobComplete(jobName: string, maxWaitTimeMs: number = 60000): Promise<string> {
   const startTime = Date.now();
   
   while (Date.now() - startTime < maxWaitTimeMs) {
@@ -53,7 +53,9 @@ async function waitForTranscriptionJobComplete(jobName: string, maxWaitTimeMs: n
         return transcriptData.results.transcripts[0].transcript;
       }
       return "";
-    } else if (status === TranscriptionJobStatus.FAILED) {
+    }
+    
+    if (status === TranscriptionJobStatus.FAILED) {
       throw new Error(`Transcription failed: ${response.TranscriptionJob?.FailureReason}`);
     }
     
@@ -86,8 +88,9 @@ export async function transcribeB64(
     // Write the buffer to a temporary file
     await writeFile(fpath, buffer);
     
-    // Extract keywords from the prompt for context
-    const promptWords = unique(
+    // Extract keywords from the prompt for context - not used currently
+    // Kept for future implementations of custom vocabularies
+    const _promptWords = unique(
       prompt
         .split(/\s+|[.,!?;:()]/)
         .filter(Boolean)

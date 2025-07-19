@@ -8,7 +8,7 @@ import {
 import { errorReport } from "./error-report";
 import { bedrockConfig } from "./aws-config";
 import { getAwsClientConfig } from "./aws-credential-config";
-import { createImagePrompt } from "./bedrock-llm";
+// Import removed as it's not used
 
 // Create Bedrock client with proper credential chain
 const bedrockClient = new BedrockRuntimeClient(getAwsClientConfig());

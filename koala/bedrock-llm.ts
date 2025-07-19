@@ -1,7 +1,7 @@
 import { 
   BedrockRuntimeClient, 
-  InvokeModelCommand,
-  InvokeModelWithResponseStreamCommand
+  InvokeModelCommand
+  // InvokeModelWithResponseStreamCommand is removed as it's unused
 } from "@aws-sdk/client-bedrock-runtime";
 import { errorReport } from "./error-report";
 import { awsConfig, bedrockConfig } from "./aws-config";
@@ -37,7 +37,7 @@ interface ClaudeParams {
   stop_sequences?: string[];
   response_format?: {
     type: string;
-    schema?: Record<string, any>;
+    schema?: Record<string, unknown>;
   };
 }
 
@@ -64,7 +64,7 @@ export async function bedrockCall(params: {
   max_tokens?: number;
   temperature?: number;
   system?: string;
-  response_format?: { type: string; schema?: Record<string, any> };
+  response_format?: { type: string; schema?: Record<string, unknown> };
 }): Promise<ModelResponse<ClaudeResponse>> {
   try {
     // Format messages for Claude
@@ -113,7 +113,7 @@ export async function bedrockCall(params: {
 // Function to parse JSON schema responses from Claude
 export async function bedrockParseWithSchema<T>(params: {
   messages: Array<{ role: string; content: string }>;
-  schema: Record<string, any>;
+  schema: Record<string, unknown>;
   max_tokens?: number;
   temperature?: number;
   system?: string;

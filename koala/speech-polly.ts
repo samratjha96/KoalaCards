@@ -9,8 +9,8 @@ import {
 import { createHash } from "crypto";
 import { draw } from "radash";
 import { Gender, LangCode } from "./shared-types";
-import { createBlobID, uploadBufferToS3 } from "./storage-s3";
-import { awsConfig, pollyConfig, s3Config } from "./aws-config";
+import { uploadBufferToS3 } from "./storage-s3";
+import { awsConfig } from "./aws-config";  // removed unused imports
 
 type AudioLessonParams = {
   text: string;
@@ -221,8 +221,8 @@ async function callPolly(voice: VoiceId, params: AudioLessonParams) {
     }
     
     return Buffer.concat(chunks);
-  } catch (error) {
-    throw new Error(`Failed to synthesize speech: ${error}`);
+  } catch (_error: unknown) {
+    throw new Error(`Failed to synthesize speech: ${_error instanceof Error ? _error.message : String(_error)}`);
   }
 }
 
@@ -243,7 +243,7 @@ export async function generateSpeechURL(
     // Try to get a signed URL for an existing file
     const signedUrl = await getSignedS3Url(fileName);
     return signedUrl;
-  } catch (error) {
+  } catch {
     // If the file doesn't exist, generate it
     const lang = params.langCode.slice(0, 2).toLowerCase();
     const voice = randomVoice(lang, params.gender);
@@ -263,7 +263,7 @@ async function getSignedS3Url(key: string): Promise<string> {
     // Import dynamically to avoid circular dependencies
     const { getSignedS3Url } = await import("./storage-s3");
     return await getSignedS3Url(key);
-  } catch (error) {
+  } catch {
     throw new Error(`File not found: ${key}`);
   }
 }
