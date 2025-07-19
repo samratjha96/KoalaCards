@@ -4,13 +4,11 @@ import {
   // InvokeModelWithResponseStreamCommand is removed as it's unused
 } from "@aws-sdk/client-bedrock-runtime";
 import { errorReport } from "./error-report";
-import { awsConfig, bedrockConfig } from "./aws-config";
+import { bedrockConfig } from "./aws-config";
+import { getAwsClientConfig } from "./aws-credential-config";
 
-// Create Bedrock client
-const bedrockClient = new BedrockRuntimeClient({
-  region: awsConfig.region,
-  credentials: awsConfig.credentials,
-});
+// Create Bedrock client with proper credential provider chain
+const bedrockClient = new BedrockRuntimeClient(getAwsClientConfig());
 
 // Generic type for model responses
 type ModelResponse<T> = {

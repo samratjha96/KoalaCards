@@ -4,9 +4,14 @@
 import { z } from 'zod';
 
 export function zodResponseFormat<T extends z.ZodType>(schema: T, responseFormat?: string) {
+  // Handle ZodObject which has a shape property
+  const schemaObj = ('shape' in schema && typeof schema.shape === 'object') ? 
+    schema.shape : 
+    schema;
+    
   return {
     type: "json_object",
-    schema: schema.shape || schema,
+    schema: schemaObj,
     responseFormat,
   };
 }

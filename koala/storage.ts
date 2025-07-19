@@ -55,10 +55,17 @@ export const bucket = {
         return [url];
       },
       save: async (data: Buffer, options: Record<string, unknown> | undefined): Promise<void> => {
+        const contentType = options && 
+          typeof options === 'object' && 
+          options.metadata && 
+          typeof options.metadata === 'object' && 
+          'contentType' in options.metadata ? 
+          String(options.metadata.contentType) : 'application/octet-stream';
+
         await uploadBufferToS3(
           data,
           fileName,
-          options?.metadata?.contentType || 'application/octet-stream'
+          contentType
         );
       },
       cloudStorageURI: {},
@@ -80,7 +87,7 @@ export const bucket = {
               promise.then(() => {
                 uploadBufferToS3(Buffer.concat(chunks), fileName)
                   .then(() => callback())
-                  .catch((error) => this.emit('error', error));
+                  .catch((error) => callback(error instanceof Error ? error : new Error(String(error))));
               });
             }
             if (event === 'error') {

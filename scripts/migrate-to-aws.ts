@@ -8,7 +8,7 @@
  * 4. Updates imports in existing files to use AWS services
  */
 
-import fs from 'fs/promises';
+// fs import removed as it's not used
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';

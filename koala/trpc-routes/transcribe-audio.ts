@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { getUserSettings } from "../auth-helpers";
+// Import removed as it's no longer used
+// import { getUserSettings } from "../auth-helpers";
 import { transcribeB64 } from "../transcribe";
 import { procedure } from "../trpc-procedure";
 import { LANG_CODES } from "../shared-types";
@@ -17,12 +18,11 @@ export const transcribeAudio = procedure
       result: z.string(),
     }),
   )
-  .mutation(async ({ ctx, input }) => {
-    const us = await getUserSettings(ctx.user?.id);
+  .mutation(async ({ input }) => {
+    // User settings no longer needed as transcribeB64 doesn't use userID
+    // const us = await getUserSettings(ctx.user?.id);
     const result = await transcribeB64(
       input.audio,
-      us.userId,
-      input.targetText,
       input.lang,
     );
     if (result.kind === "error") {

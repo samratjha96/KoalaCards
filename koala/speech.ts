@@ -3,7 +3,7 @@
  */
 import { Card } from "@prisma/client";
 import { template } from "radash";
-import { LessonType } from "./shared-types";
+import { Gender, LessonType } from "./shared-types";
 import { removeParens } from "./quiz-evaluators/evaluator-utils";
 import { generateSpeechURL } from "./generate-speech-url";
 
@@ -39,7 +39,7 @@ export async function generateLessonAudio(params: AudioLessonParams): Promise<st
   // Generate speech using Amazon Polly and get the signed URL
   return await generateSpeechURL({
     text: ssml,
-    gender: params.card.gender,
+    gender: params.card.gender as Gender,
     langCode: params.card.langCode,
     speed: params.speed,
   });

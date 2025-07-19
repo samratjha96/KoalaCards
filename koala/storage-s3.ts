@@ -4,13 +4,11 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { createHash } from "crypto";
 import fetch from "node-fetch";
 import { errorReport } from "./error-report";
-import { awsConfig, s3Config } from "./aws-config";
+import { s3Config } from "./aws-config";
+import { getAwsClientConfig } from "./aws-credential-config";
 
-// Create S3 client
-const s3Client = new S3Client({
-  region: awsConfig.region,
-  credentials: awsConfig.credentials,
-});
+// Create S3 client with proper credential provider chain
+const s3Client = new S3Client(getAwsClientConfig());
 
 // Generate a signed URL for S3 object
 export async function getSignedS3Url(key: string): Promise<string> {

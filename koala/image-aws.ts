@@ -44,7 +44,7 @@ export async function maybeAddImageToCard(card: Card) {
   }
 
   const prompt = await createImagePrompt(card.term, card.definition);
-  const url = await createBedrockImage(prompt, card.definition);
+  const url = await createBedrockImage(prompt);
   const filePath = createBlobID("card-images", card.term, "jpg");
   await storeUrlToS3(url, filePath);
   await prismaClient.card.update({

@@ -2,20 +2,50 @@
 import { bedrockCall, createImagePrompt, createBedrockImage } from './aws-services';
 import { errorReport } from "./error-report";
 
+// Define proper type interfaces for OpenAI-compatible request and response formats
+interface OpenAIRequestOptions {
+  messages: Array<{ role: string; content: string }>;
+  max_tokens?: number;
+  temperature?: number;
+  response_format?: ResponseFormat;
+  [key: string]: unknown;
+}
+
+interface ResponseFormat {
+  type: string;
+  schema?: Record<string, unknown>;
+}
+
+interface OpenAIResponse {
+  choices: Array<{
+    message: {
+      content: string;
+      role: string;
+      parsed?: unknown;
+    };
+  }>;
+  usage?: {
+    total_tokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+}
+
 // Mock OpenAI API for backward compatibility
 export const openai = {
   chat: {
     completions: {
-      create: async (opts: Record<string, unknown>) => {
-        const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
+      create: async (opts: OpenAIRequestOptions) => {
+        // Map the messages to the format expected by bedrockCall
+        const messages = opts.messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
 
         const result = await bedrockCall({
           messages,
-          max_tokens: opts.max_tokens || 1024,
-          temperature: opts.temperature || 0.7,
+          max_tokens: typeof opts.max_tokens === 'number' ? opts.max_tokens : 1024,
+          temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
           system: messages.find(m => m.role === "system")?.content,
         });
 
@@ -36,24 +66,27 @@ export const openai = {
           },
         };
       },
-      parse: async (opts: Record<string, unknown>) => {
-        const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
+      parse: async (opts: OpenAIRequestOptions) => {
+        // Map the messages to the format expected by bedrockCall
+        const messages = opts.messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
 
-        // Handle schema parsing
-        const schema = opts.response_format?.schema;
+        // Get schema from response_format if it exists
+        const responseFormat = opts.response_format;
+        const schema = responseFormat?.schema;
+        
         if (schema) {
           try {
             const result = await bedrockCall({
               messages,
-              max_tokens: opts.max_tokens || 1024,
-              temperature: opts.temperature || 0.7,
+              max_tokens: typeof opts.max_tokens === 'number' ? opts.max_tokens : 1024,
+              temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
               system: messages.find(m => m.role === "system")?.content,
               response_format: {
                 type: "json_object",
-                schema: schema,
+                schema,
               },
             });
 
@@ -78,8 +111,8 @@ export const openai = {
         // Handle regular responses
         const result = await bedrockCall({
           messages,
-          max_tokens: opts.max_tokens || 1024,
-          temperature: opts.temperature || 0.7,
+          max_tokens: typeof opts.max_tokens === 'number' ? opts.max_tokens : 1024,
+          temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
           system: messages.find(m => m.role === "system")?.content,
         });
 
@@ -98,7 +131,7 @@ export const openai = {
   },
   images: {
     generate: async (opts: {prompt: string}) => {
-      const imageUrl = await createBedrockImage(opts.prompt, opts.prompt);
+      const imageUrl = await createBedrockImage(opts.prompt);
       
       return {
         data: [
@@ -123,24 +156,27 @@ export const openai = {
   beta: {
     chat: {
       completions: {
-        parse: async (opts: Record<string, unknown>) => {
-          const messages = (opts.messages as Array<{role: string; content: string}>).map((msg) => ({
+        parse: async (opts: OpenAIRequestOptions) => {
+          // Map the messages to the format expected by bedrockCall
+          const messages = opts.messages.map((msg) => ({
             role: msg.role,
             content: msg.content,
           }));
 
-          // Handle schema parsing
-          const schema = opts.response_format?.schema;
+          // Get schema from response_format if it exists
+          const responseFormat = opts.response_format;
+          const schema = responseFormat?.schema;
+          
           if (schema) {
             try {
               const result = await bedrockCall({
                 messages,
-                max_tokens: opts.max_tokens || 1024,
-                temperature: opts.temperature || 0.7,
+                max_tokens: typeof opts.max_tokens === 'number' ? opts.max_tokens : 1024,
+                temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
                 system: messages.find(m => m.role === "system")?.content,
                 response_format: {
                   type: "json_object",
-                  schema: schema,
+                  schema,
                 },
               });
 
@@ -165,8 +201,8 @@ export const openai = {
           // Handle regular responses
           const result = await bedrockCall({
             messages,
-            max_tokens: opts.max_tokens || 1024,
-            temperature: opts.temperature || 0.7,
+            max_tokens: opts.max_tokens ? Number(opts.max_tokens) : 1024,
+            temperature: opts.temperature ? Number(opts.temperature) : 0.7,
             system: messages.find(m => m.role === "system")?.content,
           });
 
@@ -186,7 +222,7 @@ export const openai = {
   },
 };
 
-export async function gptCall(opts: Record<string, unknown>) {
+export async function gptCall(opts: OpenAIRequestOptions): Promise<OpenAIResponse> {
   return await openai.chat.completions.create(opts);
 }
 
@@ -198,5 +234,5 @@ export const createDallEPrompt = async (
 };
 
 export const createDallEImage = async (prompt: string) => {
-  return await createBedrockImage(prompt, prompt);
+  return await createBedrockImage(prompt);
 };

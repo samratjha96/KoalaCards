@@ -10,7 +10,7 @@ import { createHash } from "crypto";
 import { draw } from "radash";
 import { Gender, LangCode } from "./shared-types";
 import { uploadBufferToS3 } from "./storage-s3";
-import { awsConfig } from "./aws-config";  // removed unused imports
+import { getAwsClientConfig } from "./aws-credential-config";
 
 type AudioLessonParams = {
   text: string;
@@ -27,6 +27,62 @@ const Voices: LangLookTable = {
     F: ["Zeina"],
     M: ["Zeina"], // Only female available for Arabic
     N: ["Zeina"],
+  },
+  // Adding missing languages with English fallbacks
+  el: {
+    F: ["Joanna"],
+    M: ["Matthew"],
+    N: ["Joanna"],
+  },
+  gl: {
+    F: ["Joanna"],
+    M: ["Matthew"],
+    N: ["Joanna"],
+  },
+  gu: {
+    F: ["Aditi"],
+    M: ["Aditi"],
+    N: ["Aditi"],
+  },
+  hu: {
+    F: ["Joanna"],
+    M: ["Matthew"],
+    N: ["Joanna"],
+  },
+  kn: {
+    F: ["Aditi"],
+    M: ["Aditi"],
+    N: ["Aditi"],
+  },
+  lt: {
+    F: ["Joanna"],
+    M: ["Matthew"],
+    N: ["Joanna"],
+  },
+  lv: {
+    F: ["Joanna"],
+    M: ["Matthew"],
+    N: ["Joanna"],
+  },
+  mr: {
+    F: ["Aditi"],
+    M: ["Aditi"],
+    N: ["Aditi"],
+  },
+  pa: {
+    F: ["Aditi"],
+    M: ["Aditi"],
+    N: ["Aditi"],
+  },
+  sk: {
+    F: ["Vicki"],
+    M: ["Vicki"],
+    N: ["Vicki"],
+  },
+  sr: {
+    F: ["Tatyana"],
+    M: ["Maxim"],
+    N: ["Tatyana"],
   },
   he: {
     F: ["Ruth"],
@@ -109,10 +165,11 @@ const Voices: LangLookTable = {
     M: ["Lea"], // Only female available for Indonesian
     N: ["Lea"],
   },
+  // Using valid AWS Polly voices for Malay (using English voices as fallback)
   ms: {
-    F: ["Nina"],
-    M: ["Nina"], // Only female available for Malay
-    N: ["Nina"],
+    F: ["Kendra", "Joanna"],
+    M: ["Matthew", "Joey"],
+    N: ["Salli", "Justin"],
   },
   // Norwegian
   nb: {
@@ -155,17 +212,36 @@ const Voices: LangLookTable = {
   // Add more mappings as needed
 };
 
-// Create a Polly client
-const pollyClient = new PollyClient({
-  region: awsConfig.region,
-  credentials: awsConfig.credentials,
-});
+// Create a Polly client with proper credential provider chain
+const pollyClient = new PollyClient(getAwsClientConfig());
+
+/**
+ * Helper function to convert AWS SDK stream responses to Buffer
+ * Handles the proper typing of AWS SDK streams that don't conform to AsyncIterable interface
+ */
+async function streamToBuffer(stream: unknown): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  if (stream) {
+    // The AWS SDK types for AudioStream are not properly typed as AsyncIterable
+    // Use a type assertion with a more specific type for better safety
+    const asyncIterable = stream as { [Symbol.asyncIterator](): AsyncIterator<Uint8Array> };
+    for await (const chunk of asyncIterable) {
+      chunks.push(chunk);
+    }
+  }
+  return Buffer.concat(chunks);
+}
 
 // Helper function to select a random voice based on language and gender
 const randomVoice = (langCode: string, gender: string): VoiceId => {
-  const l1 = Voices[langCode as LangCode] || Voices.en; // Default to English if language not found
-  const l2 = l1[gender as Gender] || l1.N;
-  return draw(l2) || l2[0];
+  // Get voices for the language, defaulting to English if not found
+  const languageVoices = Voices[langCode as LangCode] || Voices.en;
+  
+  // Get voices for the specific gender, defaulting to neutral if not found
+  const genderVoices = languageVoices[gender as Gender] || languageVoices.N;
+  
+  // Select a random voice or use the first one if random selection fails
+  return draw(genderVoices) || genderVoices[0];
 };
 
 // Version identifier for cache busting
@@ -212,15 +288,8 @@ async function callPolly(voice: VoiceId, params: AudioLessonParams) {
   try {
     const response = await pollyClient.send(command);
     
-    // Convert the audio stream to a buffer
-    const chunks: Uint8Array[] = [];
-    if (response.AudioStream) {
-      for await (const chunk of response.AudioStream) {
-        chunks.push(chunk);
-      }
-    }
-    
-    return Buffer.concat(chunks);
+    // Convert the audio stream to a buffer using our helper function
+    return await streamToBuffer(response.AudioStream);
   } catch (_error: unknown) {
     throw new Error(`Failed to synthesize speech: ${_error instanceof Error ? _error.message : String(_error)}`);
   }

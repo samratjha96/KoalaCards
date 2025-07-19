@@ -8,28 +8,22 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 // createReadStream is not used, import removed
 import { writeFile, unlink, readFile } from "fs/promises";
 import path from "path";
-import { uid, unique } from "radash";
+import { uid } from "radash"; // removed unused 'unique' import
 import { LangCode } from "./shared-types";
-import { awsConfig, transcribeConfig, s3Config } from "./aws-config";
+import { transcribeConfig, s3Config } from "./aws-config";
+import { getAwsClientConfig } from "./aws-credential-config";
 
 type TranscriptionResult =
   | { kind: "OK"; text: string }
   | { kind: "error" };
 
-// Create clients
-const transcribeClient = new TranscribeClient({
-  region: awsConfig.region,
-  credentials: awsConfig.credentials,
-});
-
-const s3Client = new S3Client({
-  region: awsConfig.region,
-  credentials: awsConfig.credentials,
-});
+// Create clients with proper credential provider chain
+const transcribeClient = new TranscribeClient(getAwsClientConfig());
+const s3Client = new S3Client(getAwsClientConfig());
 
 // Map language codes to AWS Transcribe language codes
 function getTranscribeLanguageCode(language: LangCode): string {
-  return transcribeConfig.languageCodeMap[language] || "en-US";
+  return transcribeConfig.languageCodeMap[language as keyof typeof transcribeConfig.languageCodeMap] || "en-US";
 }
 
 // Helper function to wait for a transcription job to complete
@@ -68,8 +62,8 @@ async function waitForTranscriptionJobComplete(jobName: string, maxWaitTimeMs: n
 
 export async function transcribeB64(
   dataURI: string,
-  _userID: string | number,
-  prompt: string,
+  // Removed unused userID parameter
+  // Removed unused prompt parameter  
   language: LangCode,
 ): Promise<TranscriptionResult> {
   // Extract the base64 data from the URI
@@ -89,13 +83,7 @@ export async function transcribeB64(
     await writeFile(fpath, buffer);
     
     // Extract keywords from the prompt for context - not used currently
-    // Kept for future implementations of custom vocabularies
-    const _promptWords = unique(
-      prompt
-        .split(/\s+|[.,!?;:()]/)
-        .filter(Boolean)
-        .sort(),
-    ).join(" ");
+    // Removed unused variable
     
     // Upload the audio file to S3
     const fileContent = await readFile(fpath);
@@ -115,7 +103,7 @@ export async function transcribeB64(
       Media: {
         MediaFileUri: `s3://${s3Config.bucketName}/${s3Key}`
       },
-      LanguageCode: getTranscribeLanguageCode(language),
+      LanguageCode: getTranscribeLanguageCode(language) as import("@aws-sdk/client-transcribe").LanguageCode,
       MediaFormat: "wav",
       Settings: {
         ShowSpeakerLabels: false,

@@ -10,7 +10,7 @@ import {
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { writeFile, unlink } from "fs/promises";
 import path from "path";
-import { uid, unique } from "radash";
+import { uid } from "radash"; // removed unused 'unique' import
 import { LangCode } from "./shared-types";
 import { transcribeConfig, s3Config } from "./aws-config";
 import { getAwsClientConfig } from "./aws-credential-config";
@@ -26,7 +26,7 @@ const s3Client = new S3Client(getAwsClientConfig());
 
 // Map language codes to AWS Transcribe language codes
 function getTranscribeLanguageCode(language: LangCode): string {
-  return transcribeConfig.languageCodeMap[language] || "en-US";
+  return transcribeConfig.languageCodeMap[language as keyof typeof transcribeConfig.languageCodeMap] || "en-US";
 }
 
 // Helper function to wait for a transcription job to complete
@@ -66,15 +66,13 @@ async function waitForTranscriptionJobComplete(jobName: string, maxWaitTimeMs: n
 /**
  * Transcribe audio from base64 data URI to text
  * @param dataURI The base64 data URI containing the audio
- * @param _userID User ID for tracking
- * @param prompt The prompt text to assist with transcription
  * @param language The language code of the audio
  * @returns A result object containing the transcribed text or error
  */
 export async function transcribeB64(
   dataURI: string,
-  _userID: string | number,
-  prompt: string,
+  // Removed unused userID parameter
+  // Removed unused prompt parameter
   language: LangCode,
 ): Promise<TranscriptionResult> {
   // Extract the base64 data from the URI
@@ -94,12 +92,8 @@ export async function transcribeB64(
     await writeFile(fpath, buffer);
     
     // Extract keywords from the prompt for context
-    const promptWords = unique(
-      prompt
-        .split(/\s+|[.,!?;:()]/)
-        .filter(Boolean)
-        .sort(),
-    ).join(" ");
+    // Remove unused promptWords variable
+    // We'll keep the prompt for future reference without generating unused variables
     
     // Upload the audio file to S3
     await s3Client.send(
@@ -117,15 +111,14 @@ export async function transcribeB64(
       Media: {
         MediaFileUri: `s3://${s3Config.bucketName}/${s3Key}`
       },
-      LanguageCode: getTranscribeLanguageCode(language),
+      LanguageCode: getTranscribeLanguageCode(language) as import("@aws-sdk/client-transcribe").LanguageCode,
       MediaFormat: "wav",
       Settings: {
         ShowSpeakerLabels: false,
         MaxSpeakerLabels: 1,
         // Use the prompt words to help with transcription accuracy
-        VocabularyFilterMethod: "mask",
-        // Include the prompt words as context
-        LanguageModelName: `${promptWords.substring(0, 50)}`, // Limited length
+        VocabularyFilterMethod: "mask"
+        // Remove LanguageModelName as it's not a valid field in Settings
       }
     });
     
